@@ -34,7 +34,7 @@ export default function ClientModal({ client, onClose, onUpdate }) {
       try {
         const { data, error } = await supabase
           .from('account_devices')
-          .select('*')
+          .select('id, device_id, device_alias, last_seen')
           .eq('email', client.email)
           .order('last_seen', { ascending: false });
           

@@ -21,7 +21,7 @@ export default function ClientsView() {
     try {
       const { data, error } = await supabase
         .from('cloud_licenses')
-        .select('*')
+        .select('id, email, business_name, plan_tier, active, days_remaining, max_devices, phone, license_type, created_at, updated_at, valid_until')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
