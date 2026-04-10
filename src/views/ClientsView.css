@@ -285,3 +285,68 @@
   background: transparent;
   color: var(--text-muted);
 }
+
+/* Filter Bar */
+.filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: rgba(15, 23, 42, 0.4);
+  border-bottom: 1px solid var(--glass-border);
+  flex-wrap: wrap;
+}
+
+.filter-bar .glass-input {
+  width: auto;
+  min-width: 120px;
+  padding: 6px 10px;
+  font-size: 0.8rem;
+}
+
+.filter-clear {
+  font-size: 0.8rem;
+  color: var(--primary-light);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.filter-clear:hover {
+  background: var(--bg-hover);
+}
+
+.filter-count {
+  margin-left: auto;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* Sortable Column Headers */
+.sortable-th {
+  cursor: pointer;
+  user-select: none;
+}
+
+.sortable-th:hover {
+  color: var(--primary-light);
+}
+
+.sort-icon {
+  font-size: 0.7rem;
+  margin-left: 4px;
+  opacity: 0.6;
+}
+
+/* Row color coding */
+.row-expired td {
+  background: rgba(244, 63, 94, 0.04) !important;
+}
+
+.row-warning td {
+  background: rgba(245, 158, 11, 0.04) !important;
+}

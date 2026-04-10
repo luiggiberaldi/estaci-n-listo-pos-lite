@@ -1,75 +1,98 @@
-import { useState } from 'react';
-import { LayoutDashboard, Users, ShieldCheck, Settings, LogOut } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { LayoutDashboard, Users, Bell, Settings, LogOut, ShieldCheck, Activity } from 'lucide-react';
 import './App.css';
 
-// Views placeholders
 import DashboardView from './views/DashboardView';
 import ClientsView from './views/ClientsView';
+import AlertsView from './views/AlertsView';
+import SettingsView from './views/SettingsView';
 import LockScreen from './components/LockScreen';
+import { supabase } from './config/supabase';
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [alertCount, setAlertCount] = useState(0);
+  const lockRef = useRef(null);
+
+  const fetchAlertCount = async () => {
+    const sevenDaysFromNow = new Date(Date.now() + 7 * 86400000).toISOString();
+    const { data } = await supabase
+      .from('cloud_licenses')
+      .select('id', { count: 'exact' })
+      .lte('valid_until', sevenDaysFromNow)
+      .eq('active', true)
+      .neq('license_type', 'permanent');
+    setAlertCount(data?.length || 0);
+  };
+
+  useEffect(() => {
+    fetchAlertCount();
+    const interval = setInterval(fetchAlertCount, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleLogout = () => {
+    lockRef.current?.();
+  };
+
+  const navItems = [
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'clients', label: 'Clientes & Licencias', icon: Users },
+    { id: 'alerts', label: 'Alertas', icon: Bell, badge: alertCount },
+    { id: 'settings', label: 'Configuración', icon: Settings },
+  ];
 
   return (
-    <LockScreen>
+    <LockScreen lockRef={lockRef}>
       <div className="app-container">
-      {/* Sidebar Neumórfico/Glass */}
-      <aside className="sidebar fade-in-up">
-        <div className="sidebar-header">
-          <div className="logo-icon" style={{ background: 'var(--primary)', padding: '6px', borderRadius: '8px' }}>
-            <ShieldCheck size={24} color="#fff" />
+        <aside className="sidebar">
+          <div className="sidebar-header">
+            <ShieldCheck size={22} color="var(--primary)" strokeWidth={2.5} />
+            <h1>Listo POS Lite Master</h1>
+            <span className="v2-badge">v2.0</span>
           </div>
-          <h1>Abasto Station</h1>
-        </div>
-        
-        <nav className="nav-links">
-          <div 
-            className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}
-            onClick={() => setActiveTab('dashboard')}
-          >
-            <LayoutDashboard size={20} className="nav-icon" />
-            <span>Dashboard</span>
-          </div>
-          <div 
-            className={`nav-item ${activeTab === 'clients' ? 'active' : ''}`}
-            onClick={() => setActiveTab('clients')}
-          >
-            <Users size={20} className="nav-icon" />
-            <span>Clientes & Licencias</span>
-          </div>
-          <div 
-            className={`nav-item ${activeTab === 'settings' ? 'active' : ''}`}
-            onClick={() => setActiveTab('settings')}
-          >
-            <Settings size={20} className="nav-icon" />
-            <span>Configuración</span>
-          </div>
-        </nav>
 
-        <div className="user-profile">
-          <div className="user-avatar">A</div>
-          <div style={{ flex: 1, overflow: 'hidden' }}>
-            <div style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Admin</div>
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Estación Maestra</div>
-          </div>
-          <button className="glass-button" style={{ padding: '8px', border: 'none', background: 'transparent' }} aria-label="Cerrar sesión">
-            <LogOut size={18} color="var(--danger)" />
-          </button>
-        </div>
-      </aside>
+          <nav className="nav-links">
+            {navItems.map(({ id, label, icon: Icon, badge }) => (
+              <div
+                key={id}
+                className={`nav-item ${activeTab === id ? 'active' : ''}`}
+                onClick={() => setActiveTab(id)}
+              >
+                <Icon size={20} className="nav-icon" />
+                <span>{label}</span>
+                {badge > 0 && (
+                  <span className="alert-badge">{badge}</span>
+                )}
+              </div>
+            ))}
+          </nav>
 
-      {/* Contenido Principal */}
-      <main className="main-content">
-        {activeTab === 'dashboard' && <DashboardView />}
-        {activeTab === 'clients' && <ClientsView />}
-        {activeTab === 'settings' && (
-           <div className="glass-panel fade-in-up" style={{ padding: '2rem', height: '100%' }}>
-              <h2>Configuración</h2>
-              <p style={{ color: 'var(--text-muted)', marginTop: '0.5rem' }}>Ajustes del sistema y WebAuthn</p>
-           </div>
-        )}
-      </main>
-    </div>
+          <div className="user-profile">
+            <div className="user-avatar">A</div>
+            <div style={{ flex: 1, overflow: 'hidden' }}>
+              <div style={{ fontWeight: 600, fontSize: '0.875rem', color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Admin</div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Estación Maestra</div>
+            </div>
+            <button
+              className="glass-button"
+              style={{ padding: '8px', border: 'none', background: 'transparent', cursor: 'pointer' }}
+              aria-label="Bloquear estación"
+              title="Bloquear estación"
+              onClick={handleLogout}
+            >
+              <LogOut size={18} color="var(--danger)" />
+            </button>
+          </div>
+        </aside>
+
+        <main className="main-content">
+          {activeTab === 'dashboard' && <DashboardView />}
+          {activeTab === 'clients' && <ClientsView />}
+          {activeTab === 'alerts' && <AlertsView />}
+          {activeTab === 'settings' && <SettingsView />}
+        </main>
+      </div>
     </LockScreen>
   );
 }

@@ -1,0 +1,11 @@
+{
+  "name": "estacion-listo-pos-lite",
+  "main": "./worker.js",
+  "compatibility_date": "2024-12-01",
+  "assets": {
+    "directory": "./dist/",
+    "binding": "ASSETS",
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "single-page-application"
+  }
+}

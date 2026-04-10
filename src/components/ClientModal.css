@@ -72,6 +72,48 @@
   gap: 1rem;
 }
 
+.modal-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 0 1.5rem;
+  border-bottom: 1px solid var(--glass-border);
+  background: rgba(15, 23, 42, 0.3);
+}
+
+.modal-tab {
+  padding: 12px 20px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: -1px;
+}
+
+.modal-tab:hover {
+  color: var(--text-main);
+}
+
+.modal-tab.active {
+  color: var(--primary-light);
+  border-bottom-color: var(--primary);
+}
+
+.tab-count {
+  background: rgba(99, 102, 241, 0.25);
+  color: var(--primary-light);
+  border-radius: 99px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 1px 6px;
+}
+
 .modal-body-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -231,6 +273,22 @@ input:checked + .slider:before {
   transform: translateY(-2px);
 }
 
+.mrr-input-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  background: rgba(99, 102, 241, 0.07);
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  border-radius: 10px;
+  margin-top: 8px;
+}
+
+.mrr-input-row label {
+  margin-bottom: 0;
+  font-size: 0.7rem;
+}
+
 /* Empty State Devices */
 .empty-devices {
   display: flex;
@@ -257,6 +315,17 @@ input:checked + .slider:before {
   background: rgba(255,255,255,0.05);
 }
 
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 3rem 1rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
 .devices-list {
   display: flex;
   flex-direction: column;
@@ -276,7 +345,7 @@ input:checked + .slider:before {
 
 .device-card:hover {
   background: rgba(30, 41, 59, 0.9);
-  border-color: rgba(239, 68, 68, 0.3); /* Subtle red glow indication */
+  border-color: rgba(239, 68, 68, 0.3);
 }
 
 .device-info {
@@ -290,6 +359,44 @@ input:checked + .slider:before {
   background: rgba(59, 130, 246, 0.1);
   padding: 0.5rem;
   border-radius: 8px;
+}
+
+.history-tab {
+  padding: 1.5rem;
+  max-height: 420px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.history-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.history-table th {
+  text-align: left;
+  padding: 8px 10px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.history-table td {
+  padding: 10px;
+  border-bottom: 1px solid rgba(99, 102, 241, 0.08);
+  color: var(--text-sub);
+}
+
+.history-table tr:last-child td {
+  border-bottom: none;
+}
+
+.history-table tr:hover td {
+  background: var(--bg-hover);
 }
 
 .modal-footer {
