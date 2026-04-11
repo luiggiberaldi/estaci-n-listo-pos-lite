@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../config/supabase';
+import { getLiveDays } from '../utils';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend
@@ -19,12 +20,6 @@ function getStoredPrices() {
     if (raw) return { ...DEFAULT_PRICES, ...JSON.parse(raw) };
   } catch (_) {}
   return { ...DEFAULT_PRICES };
-}
-
-function getLiveDays(lic) {
-  if (lic.license_type === 'permanent') return Infinity;
-  if (!lic.valid_until) return lic.days_remaining || 0;
-  return Math.max(0, Math.ceil((new Date(lic.valid_until) - new Date()) / 86400000));
 }
 
 const CustomTooltip = ({ active, payload, label }) => {
@@ -232,17 +227,18 @@ export default function DashboardView() {
     setPlanPrices(saved);
   }
 
-  const liveEstimated =
+  const liveEstimated = useMemo(() => (
     (Number(draftPrices.basic)   || 0) * stats.planDistribution.basic +
     (Number(draftPrices.pro)     || 0) * stats.planDistribution.pro +
-    (Number(draftPrices.premium) || 0) * stats.planDistribution.premium;
+    (Number(draftPrices.premium) || 0) * stats.planDistribution.premium
+  ), [draftPrices, stats.planDistribution]);
 
   // Build pie data
-  const pieData = [
+  const pieData = useMemo(() => [
     { name: 'basic',   value: stats.planDistribution.basic },
     { name: 'pro',     value: stats.planDistribution.pro },
     { name: 'premium', value: stats.planDistribution.premium },
-  ].filter(d => d.value > 0);
+  ].filter(d => d.value > 0), [stats.planDistribution]);
 
   const totalPie = pieData.reduce((s, d) => s + d.value, 0);
 

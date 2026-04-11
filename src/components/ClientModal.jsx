@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../config/supabase';
-import { X, Shield, Clock, MonitorSmartphone, PlusCircle, Save, MessageCircle, Info, Smartphone, MonitorOff, AlertTriangle } from 'lucide-react';
+import { getLiveDays } from '../utils';
+import { X, Shield, Clock, MonitorSmartphone, Save, MessageCircle, Info, Smartphone, MonitorOff, AlertTriangle } from 'lucide-react';
 import './ClientModal.css';
 
 export default function ClientModal({ client, onClose, onUpdate }) {
@@ -82,7 +83,9 @@ export default function ClientModal({ client, onClose, onUpdate }) {
 
   const addDays = (days) => {
     setFormData(prev => {
-      const baseDate = new Date();
+      // FIX: extend from current valid_until if it's in the future, otherwise from today
+      const currentExpiry = prev.valid_until ? new Date(prev.valid_until) : new Date();
+      const baseDate = new Date(Math.max(Date.now(), currentExpiry.getTime()));
       baseDate.setDate(baseDate.getDate() + days);
       return {
         ...prev,
@@ -282,7 +285,7 @@ export default function ClientModal({ client, onClose, onUpdate }) {
                             <div className="device-icon-wrapper"><Smartphone size={20} /></div>
                             <div>
                               <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{dev.device_alias || 'Bodega/Caja'}</div>
-                              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{new Date(dev.last_seen).toLocaleString()}</div>
+                              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{dev.last_seen ? new Date(dev.last_seen).toLocaleString() : 'Sin actividad registrada'}</div>
                             </div>
                           </div>
                           <button className="glass-button danger-zone" style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }} onClick={() => unlinkDevice(dev.device_id)}>

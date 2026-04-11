@@ -1,13 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../config/supabase';
-import { AlertTriangle, Clock, XCircle, MessageCircle, RefreshCw, Zap, Phone } from 'lucide-react';
+import { getLiveDays } from '../utils';
+import { AlertTriangle, Clock, XCircle, MessageCircle, RefreshCw, Zap } from 'lucide-react';
 import './AlertsView.css';
-
-function getLiveDays(client) {
-  if (client.license_type === 'permanent') return Infinity;
-  if (!client.valid_until) return client.days_remaining || 0;
-  return Math.max(0, Math.ceil((new Date(client.valid_until) - new Date()) / 86400000));
-}
 
 export default function AlertsView() {
   const [clients, setClients] = useState([]);
@@ -18,7 +13,10 @@ export default function AlertsView() {
   const fetchClients = useCallback(async () => {
     setLoading(true);
     setError(null);
-    const { data, error: fetchError } = await supabase.from('cloud_licenses').select('*');
+    // Select only needed columns — avoids downloading device_id and other unused fields
+    const { data, error: fetchError } = await supabase
+      .from('cloud_licenses')
+      .select('id, email, business_name, phone, plan_tier, active, license_type, valid_until, days_remaining, updated_at, created_at');
     if (fetchError) {
       setError(fetchError.message);
     } else {
@@ -33,26 +31,40 @@ export default function AlertsView() {
 
   const renewClient = async (client, days) => {
     setActionLoading(prev => new Set([...prev, client.id]));
-    const base = new Date(Math.max(Date.now(), new Date(client.valid_until || 0)));
-    base.setDate(base.getDate() + days);
-    await supabase.from('cloud_licenses').update({
-      days_remaining: getLiveDays(client) + days,
-      license_type: 'days',
-      valid_until: base.toISOString(),
-      updated_at: new Date().toISOString()
-    }).eq('id', client.id);
-    setActionLoading(prev => { const s = new Set(prev); s.delete(client.id); return s; });
-    fetchClients();
+    try {
+      const base = new Date(Math.max(Date.now(), new Date(client.valid_until || 0)));
+      base.setDate(base.getDate() + days);
+      const { error } = await supabase.from('cloud_licenses').update({
+        days_remaining: getLiveDays(client) + days,
+        license_type: 'days',
+        valid_until: base.toISOString(),
+        updated_at: new Date().toISOString()
+      }).eq('id', client.id);
+      if (error) throw error;
+      fetchClients();
+    } catch (err) {
+      console.error('Error al renovar:', err);
+      setError('Error al renovar licencia: ' + err.message);
+    } finally {
+      setActionLoading(prev => { const s = new Set(prev); s.delete(client.id); return s; });
+    }
   };
 
   const activateClient = async (client) => {
     setActionLoading(prev => new Set([...prev, client.id]));
-    await supabase.from('cloud_licenses').update({
-      active: true,
-      updated_at: new Date().toISOString()
-    }).eq('id', client.id);
-    setActionLoading(prev => { const s = new Set(prev); s.delete(client.id); return s; });
-    fetchClients();
+    try {
+      const { error } = await supabase.from('cloud_licenses').update({
+        active: true,
+        updated_at: new Date().toISOString()
+      }).eq('id', client.id);
+      if (error) throw error;
+      fetchClients();
+    } catch (err) {
+      console.error('Error al activar:', err);
+      setError('Error al activar licencia: ' + err.message);
+    } finally {
+      setActionLoading(prev => { const s = new Set(prev); s.delete(client.id); return s; });
+    }
   };
 
   const getWALink = (client) => {

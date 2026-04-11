@@ -1,16 +1,9 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../config/supabase';
+import { getLiveDays } from '../utils';
 import { MoreVertical, CheckCircle2, XCircle, Users, Search, MessageCircle, Monitor, X, Save, Download } from 'lucide-react';
 import ClientModal from '../components/ClientModal';
 import './ClientsView.css';
-
-// Calcula días restantes en tiempo real desde valid_until
-function getLiveDays(client) {
-  if (client.license_type === 'permanent') return Infinity;
-  if (!client.valid_until) return client.days_remaining || 0;
-  const diff = Math.ceil((new Date(client.valid_until) - new Date()) / 86400000);
-  return diff > 0 ? diff : 0;
-}
 
 const EMPTY_NEW_CLIENT = {
   email: '',
@@ -29,6 +22,8 @@ export default function ClientsView() {
   const [selectedClient, setSelectedClient] = useState(null);
   const [selectedIds, setSelectedIds] = useState([]);
   const [massActionLoading, setMassActionLoading] = useState(false);
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 50;
 
   // Filter & sort state
   const [filters, setFilters] = useState({ status: 'all', plan: 'all', type: 'all', maxDays: '' });
@@ -47,6 +42,7 @@ export default function ClientsView() {
   async function fetchClients() {
     setLoading(true);
     try {
+      // Select only needed columns to reduce egress
       const { data, error } = await supabase
         .from('cloud_licenses')
         .select('id, email, business_name, plan_tier, active, days_remaining, max_devices, phone, license_type, created_at, updated_at, valid_until')
@@ -100,11 +96,13 @@ export default function ClientsView() {
 
   const handleFilterChange = (field, value) => {
     setFilters(prev => ({ ...prev, [field]: value }));
+    setPage(1); // reset page on filter change
   };
 
   const clearFilters = () => {
     setFilters({ status: 'all', plan: 'all', type: 'all', maxDays: '' });
     setSearch('');
+    setPage(1);
   };
 
   // === SELECTION LOGIC ===
@@ -206,23 +204,36 @@ export default function ClientsView() {
   };
 
   const handleCreateClient = async () => {
-    if (!newClientData.email.trim()) {
+    const emailTrimmed = newClientData.email.trim().toLowerCase();
+    if (!emailTrimmed) {
       setNewClientError('El email es obligatorio.');
       return;
     }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newClientData.email.trim())) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailTrimmed)) {
       setNewClientError('El email no tiene un formato válido.');
+      return;
+    }
+
+    // Check for duplicate email
+    const duplicate = clients.some(c => c.email.toLowerCase() === emailTrimmed);
+    if (duplicate) {
+      setNewClientError('Ya existe una licencia con ese email.');
+      return;
+    }
+
+    const days = parseInt(newClientData.days) || 7;
+    if (days < 1) {
+      setNewClientError('Los días iniciales deben ser al menos 1.');
       return;
     }
 
     setNewClientLoading(true);
     try {
-      const days = parseInt(newClientData.days) || 7;
       const validUntil = new Date();
       validUntil.setDate(validUntil.getDate() + days);
 
       const { error } = await supabase.from('cloud_licenses').insert({
-        email: newClientData.email.trim().toLowerCase(),
+        email: emailTrimmed,
         business_name: newClientData.business_name.trim(),
         phone: newClientData.phone.trim(),
         plan_tier: newClientData.plan_tier,
@@ -231,6 +242,7 @@ export default function ClientsView() {
         days_remaining: days,
         valid_until: validUntil.toISOString(),
         active: true,
+        device_id: 'UNKNOWN',
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       });
@@ -416,6 +428,7 @@ export default function ClientsView() {
         {loading ? (
           <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>Cargando clientes...</div>
         ) : (
+          <>
           <table className="clients-table">
             <thead>
               <tr>
@@ -441,7 +454,7 @@ export default function ClientsView() {
               </tr>
             </thead>
             <tbody>
-              {filteredClients.map(client => {
+              {filteredClients.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map(client => {
                 const isSelected = selectedIds.includes(client.id);
                 const rowClass = [isSelected ? 'selected' : '', getRowClass(client)].filter(Boolean).join(' ');
                 return (
@@ -533,6 +546,32 @@ export default function ClientsView() {
               )}
             </tbody>
           </table>
+
+          {/* Paginación */}
+          {filteredClients.length > PAGE_SIZE && (
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.75rem', padding: '1rem', borderTop: '1px solid var(--glass-border)' }}>
+              <button
+                className="glass-button"
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1}
+                style={{ padding: '0.3rem 0.8rem', fontSize: '0.8rem' }}
+              >
+                ← Anterior
+              </button>
+              <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                Página {page} de {Math.ceil(filteredClients.length / PAGE_SIZE)} · {filteredClients.length} clientes
+              </span>
+              <button
+                className="glass-button"
+                onClick={() => setPage(p => Math.min(Math.ceil(filteredClients.length / PAGE_SIZE), p + 1))}
+                disabled={page >= Math.ceil(filteredClients.length / PAGE_SIZE)}
+                style={{ padding: '0.3rem 0.8rem', fontSize: '0.8rem' }}
+              >
+                Siguiente →
+              </button>
+            </div>
+          )}
+          </>
         )}
       </div>
 

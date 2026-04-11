@@ -1,17 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { Lock, Shield, AlertCircle } from 'lucide-react';
+import {
+  hashPinSecure, verifyPinSecure, hasPinV2, hasLegacyPinOnly,
+  savePinHash, getPinHash, clearPin
+} from '../utils';
 import './LockScreen.css';
 
 const PIN_LENGTH = 6;
 const LOCK_TIMEOUT_MS = 5 * 60 * 1000;
-const PIN_KEY = 'abasto_station_pin_hash';
-
-// FIX 2: Hash SHA-256 del PIN antes de guardar/comparar
-async function hashPin(pin) {
-  const encoded = new TextEncoder().encode(pin);
-  const buffer = await crypto.subtle.digest('SHA-256', encoded);
-  return Array.from(new Uint8Array(buffer)).map(b => b.toString(16).padStart(2, '0')).join('');
-}
 
 export default function LockScreen({ children, lockRef }) {
   const [isLocked, setIsLocked] = useState(true);
@@ -19,10 +15,11 @@ export default function LockScreen({ children, lockRef }) {
   const [error, setError] = useState('');
   const [isSetupMode, setIsSetupMode] = useState(false);
   const [setupPin, setSetupPin] = useState('');
+  const [migrating, setMigrating] = useState(false);
 
   const timeoutRef = useRef(null);
 
-  // FIX 3: Exponer función lock() al padre via lockRef
+  // Expose lock() to parent via lockRef
   useEffect(() => {
     if (lockRef) {
       lockRef.current = () => {
@@ -34,8 +31,12 @@ export default function LockScreen({ children, lockRef }) {
   }, [lockRef]);
 
   useEffect(() => {
-    const savedHash = localStorage.getItem(PIN_KEY);
-    if (!savedHash) {
+    if (hasLegacyPinOnly()) {
+      // Old SHA-256 hash detected — force PIN re-setup for security upgrade
+      setMigrating(true);
+      clearPin();
+      setIsSetupMode(true);
+    } else if (!hasPinV2()) {
       setIsSetupMode(true);
     }
   }, []);
@@ -55,7 +56,6 @@ export default function LockScreen({ children, lockRef }) {
     window.addEventListener('mousemove', resetTimeout);
     window.addEventListener('keydown', resetTimeout);
     window.addEventListener('click', resetTimeout);
-
     return () => {
       clearTimeout(timeoutRef.current);
       window.removeEventListener('mousemove', resetTimeout);
@@ -87,10 +87,10 @@ export default function LockScreen({ children, lockRef }) {
         setPin('');
       } else {
         if (inputPin === setupPin) {
-          // FIX 2: Guardar hash, no texto plano
-          const hashed = await hashPin(inputPin);
-          localStorage.setItem(PIN_KEY, hashed);
+          const hashed = await hashPinSecure(inputPin);
+          savePinHash(hashed);
           setIsSetupMode(false);
+          setMigrating(false);
           setIsLocked(false);
           setPin('');
           setSetupPin('');
@@ -101,9 +101,9 @@ export default function LockScreen({ children, lockRef }) {
         }
       }
     } else {
-      const savedHash = localStorage.getItem(PIN_KEY);
-      const inputHash = await hashPin(inputPin);
-      if (inputHash === savedHash) {
+      const stored = getPinHash();
+      const valid = stored ? await verifyPinSecure(inputPin, stored) : false;
+      if (valid) {
         setIsLocked(false);
         setPin('');
       } else {
@@ -125,10 +125,16 @@ export default function LockScreen({ children, lockRef }) {
           <div className={`lock-icon ${error ? 'error-shake' : ''}`}>
             {isSetupMode ? <Shield size={32} /> : <Lock size={32} />}
           </div>
-          <h2>{isSetupMode ? (setupPin ? 'Confirma tu PIN' : 'Crea un PIN Maestro') : 'Estación Bloqueada'}</h2>
+          <h2>
+            {isSetupMode
+              ? (setupPin ? 'Confirma tu PIN' : (migrating ? 'Actualiza tu PIN de Seguridad' : 'Crea un PIN Maestro'))
+              : 'Estación Bloqueada'}
+          </h2>
           <p className="subtitle">
             {isSetupMode
-              ? 'Este PIN protegerá el acceso a la gestión de licencias.'
+              ? (migrating
+                  ? 'Tu PIN fue actualizado al sistema de seguridad PBKDF2. Crea uno nuevo.'
+                  : 'Este PIN protegerá el acceso a la gestión de licencias.')
               : 'Ingresa tu PIN de 6 dígitos para acceder'}
           </p>
         </div>
@@ -145,7 +151,6 @@ export default function LockScreen({ children, lockRef }) {
           {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(num => (
             <button key={num} onClick={() => handleKeypad(num.toString())} className="key-btn">{num}</button>
           ))}
-          {/* FIX 8: Botón biométrico oculto hasta implementación real */}
           <button className="key-btn action-key" style={{ opacity: 0, pointerEvents: 'none' }} aria-hidden="true" tabIndex={-1} />
           <button onClick={() => handleKeypad('0')} className="key-btn">0</button>
           <button onClick={deleteNumber} className="key-btn action-key">⌫</button>

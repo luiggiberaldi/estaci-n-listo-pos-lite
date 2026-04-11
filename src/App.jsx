@@ -15,19 +15,28 @@ function App() {
   const lockRef = useRef(null);
 
   const fetchAlertCount = async () => {
-    const sevenDaysFromNow = new Date(Date.now() + 7 * 86400000).toISOString();
-    const { data } = await supabase
-      .from('cloud_licenses')
-      .select('id', { count: 'exact' })
-      .lte('valid_until', sevenDaysFromNow)
-      .eq('active', true)
-      .neq('license_type', 'permanent');
-    setAlertCount(data?.length || 0);
+    try {
+      const sevenDaysFromNow = new Date(Date.now() + 7 * 86400000).toISOString();
+      const { data, error } = await supabase
+        .from('cloud_licenses')
+        .select('id', { count: 'exact' })
+        .lte('valid_until', sevenDaysFromNow)
+        .eq('active', true)
+        .neq('license_type', 'permanent');
+      if (!error) setAlertCount(data?.length || 0);
+    } catch (err) {
+      console.error('fetchAlertCount error:', err);
+    }
   };
 
   useEffect(() => {
     fetchAlertCount();
-    const interval = setInterval(fetchAlertCount, 5 * 60 * 1000);
+    const interval = setInterval(() => {
+      // Skip fetch when the tab is hidden to avoid unnecessary API calls
+      if (document.visibilityState !== 'hidden') {
+        fetchAlertCount();
+      }
+    }, 30 * 60 * 1000); // 30 min — la Estación es herramienta de admin, no necesita alertas en tiempo real
     return () => clearInterval(interval);
   }, []);
 

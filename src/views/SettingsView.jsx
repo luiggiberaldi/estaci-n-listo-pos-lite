@@ -1,22 +1,11 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../config/supabase';
+import { getLiveDays, hashPinSecure, verifyPinSecure, hasPinV2, hasLegacyPinOnly, savePinHash, getPinHash, clearPin } from '../utils';
 import { DollarSign, Lock, Info, Save, CheckCircle2, Shield, Database, Eye, EyeOff } from 'lucide-react';
 import './SettingsView.css';
 
 const DEFAULT_PRICES = { basic: 5, pro: 15, premium: 30 };
 const PRICES_KEY = 'abasto_plan_prices';
-const PIN_HASH_KEY = 'abasto_station_pin_hash';
-
-function getLiveDays(client) {
-  if (client.license_type === 'permanent') return Infinity;
-  if (!client.valid_until) return client.days_remaining || 0;
-  return Math.max(0, Math.ceil((new Date(client.valid_until) - new Date()) / 86400000));
-}
-
-const hashPin = async (pin) => {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pin));
-  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
-};
 
 export default function SettingsView() {
   const [prices, setPrices] = useState(() => {
@@ -93,9 +82,9 @@ export default function SettingsView() {
       setPinSection(prev => ({ ...prev, error: 'Ingresa tu PIN actual.' }));
       return;
     }
-    const hashed = await hashPin(pinSection.currentPin);
-    const stored = localStorage.getItem(PIN_HASH_KEY);
-    if (!stored || hashed === stored) {
+    const stored = getPinHash();
+    const matches = stored ? await verifyPinSecure(pinSection.currentPin, stored) : true;
+    if (!stored || matches) {
       setPinSection(prev => ({ ...prev, step: 'verifying', error: '' }));
     } else {
       setPinSection(prev => ({ ...prev, error: 'PIN incorrecto. Inténtalo de nuevo.' }));
@@ -103,16 +92,16 @@ export default function SettingsView() {
   };
 
   const saveNewPin = async () => {
-    if (pinSection.newPin.length < 4) {
-      setPinSection(prev => ({ ...prev, error: 'El PIN debe tener al menos 4 dígitos.' }));
+    if (pinSection.newPin.length < 6) {
+      setPinSection(prev => ({ ...prev, error: 'El PIN debe tener al menos 6 dígitos.' }));
       return;
     }
     if (pinSection.newPin !== pinSection.confirmPin) {
       setPinSection(prev => ({ ...prev, error: 'Los PINs no coinciden.' }));
       return;
     }
-    const hashed = await hashPin(pinSection.newPin);
-    localStorage.setItem(PIN_HASH_KEY, hashed);
+    const hashed = await hashPinSecure(pinSection.newPin);
+    savePinHash(hashed);
     setPinSection(prev => ({ ...prev, step: 'success', error: '' }));
   };
 
