@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../config/supabase';
 import { getLiveDays } from '../utils';
-import { MoreVertical, CheckCircle2, XCircle, Users, Search, MessageCircle, Monitor, X, Save, Download } from 'lucide-react';
+import { MoreVertical, CheckCircle2, XCircle, Users, Search, MessageCircle, Monitor, X, Save, Download, Trash2 } from 'lucide-react';
 import ClientModal from '../components/ClientModal';
 import './ClientsView.css';
 
@@ -35,9 +35,35 @@ export default function ClientsView() {
   const [newClientLoading, setNewClientLoading] = useState(false);
   const [newClientError, setNewClientError] = useState('');
 
+  // Estado para confirmación de eliminación
+  const [deleteConfirm, setDeleteConfirm] = useState(null); // { email, business_name }
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+
   useEffect(() => {
     fetchClients();
   }, []);
+
+  async function handleDeleteUser() {
+    if (!deleteConfirm) return;
+    setDeleteLoading(true);
+    setDeleteError('');
+    try {
+      const res = await fetch('/api/delete-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: deleteConfirm.email }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error al eliminar');
+      setDeleteConfirm(null);
+      await fetchClients();
+    } catch (err) {
+      setDeleteError(err.message);
+    } finally {
+      setDeleteLoading(false);
+    }
+  }
 
   async function fetchClients() {
     setLoading(true);
@@ -533,6 +559,15 @@ export default function ClientsView() {
                       <button className="icon-button" onClick={() => setSelectedClient(client)} title="Abrir Ficha Administrativa">
                         <MoreVertical size={18} />
                       </button>
+
+                      <button
+                        className="icon-button"
+                        style={{ color: 'var(--danger)' }}
+                        title="Eliminar usuario"
+                        onClick={() => { setDeleteConfirm(client); setDeleteError(''); }}
+                      >
+                        <Trash2 size={16} />
+                      </button>
                     </td>
                   </tr>
                 );
@@ -658,6 +693,57 @@ export default function ClientsView() {
           </div>
         </div>
       )}
+
+      {/* Modal confirmación eliminar usuario */}
+      {deleteConfirm && (
+        <div className="modal-overlay" onClick={() => !deleteLoading && setDeleteConfirm(null)}>
+          <div className="modal-container" style={{ maxWidth: '420px' }} onClick={e => e.stopPropagation()}>
+            <header className="modal-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div style={{ width: 38, height: 38, borderRadius: '50%', background: 'rgba(239,68,68,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Trash2 size={18} color="var(--danger)" />
+                </div>
+                <div>
+                  <h2 style={{ margin: 0, fontSize: '1rem' }}>Eliminar usuario</h2>
+                  <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)' }}>Esta acción no se puede deshacer</p>
+                </div>
+              </div>
+              <button className="icon-button" onClick={() => setDeleteConfirm(null)} disabled={deleteLoading}><X size={20} /></button>
+            </header>
+
+            <div className="modal-body" style={{ padding: '1.25rem' }}>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1rem' }}>
+                ¿Estás seguro de que deseas eliminar permanentemente al usuario:
+              </p>
+              <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: '10px', padding: '0.85rem 1rem' }}>
+                <div style={{ fontWeight: 700, color: 'var(--text-main)' }}>{deleteConfirm.business_name || '(sin nombre)'}</div>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{deleteConfirm.email}</div>
+              </div>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.85rem', lineHeight: 1.5 }}>
+                Se eliminarán: cuenta de Supabase, licencia, dispositivos y backup en la nube.
+              </p>
+              {deleteError && (
+                <div style={{ color: 'var(--danger)', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '8px', padding: '0.75rem', fontSize: '0.875rem', marginTop: '0.75rem' }}>
+                  {deleteError}
+                </div>
+              )}
+            </div>
+
+            <footer className="modal-footer">
+              <button className="glass-button" onClick={() => setDeleteConfirm(null)} disabled={deleteLoading}>Cancelar</button>
+              <button
+                className="glass-button"
+                style={{ background: 'var(--danger)', color: '#fff', borderColor: 'var(--danger)' }}
+                onClick={handleDeleteUser}
+                disabled={deleteLoading}
+              >
+                {deleteLoading ? 'Eliminando...' : <><Trash2 size={15} /> Eliminar definitivamente</>}
+              </button>
+            </footer>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
