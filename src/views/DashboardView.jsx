@@ -100,17 +100,22 @@ export default function DashboardView() {
         .select('id, email, business_name, active, license_type, valid_until, plan_tier, days_remaining');
       if (licErr) throw licErr;
 
-      // 2. Fetch audit logs for last 6 months
+      // 2. Fetch audit logs for last 6 months (non-fatal — dashboard still works without MRR history)
       const sixMonthsAgo = new Date();
       sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
       sixMonthsAgo.setDate(1);
       sixMonthsAgo.setHours(0, 0, 0, 0);
 
-      const { data: logs, error: logErr } = await supabase
-        .from('license_audit_logs')
-        .select('mrr_value, created_at')
-        .gte('created_at', sixMonthsAgo.toISOString());
-      if (logErr) throw logErr;
+      let logs = [];
+      try {
+        const { data: logData, error: logErr } = await supabase
+          .from('license_audit_logs')
+          .select('mrr_value, created_at')
+          .gte('created_at', sixMonthsAgo.toISOString());
+        if (!logErr && logData) logs = logData;
+      } catch (logFetchErr) {
+        console.warn('DashboardView: audit logs fetch failed (non-fatal):', logFetchErr);
+      }
 
       // 3. Process licenses
       const now = new Date();
@@ -147,7 +152,7 @@ export default function DashboardView() {
         const d = new Date();
         d.setMonth(d.getMonth() - i);
         const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-        const label = d.toLocaleString('es-ES', { month: 'short' });
+        const label = d.toLocaleString('es-MX', { month: 'short' });
         const capitalized = label.charAt(0).toUpperCase() + label.slice(1);
         monthMap[key] = { month: capitalized, mrr: 0 };
       }

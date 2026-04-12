@@ -102,9 +102,9 @@ export default function ClientsView() {
       return sortConfig.dir === 'asc' ? da - db : db - da;
     }
     if (sortConfig.key === 'valid_until') {
-      return sortConfig.dir === 'asc'
-        ? new Date(a.valid_until) - new Date(b.valid_until)
-        : new Date(b.valid_until) - new Date(a.valid_until);
+      const dateA = a.valid_until ? new Date(a.valid_until).getTime() : 0;
+      const dateB = b.valid_until ? new Date(b.valid_until).getTime() : 0;
+      return sortConfig.dir === 'asc' ? dateA - dateB : dateB - dateA;
     }
     return sortConfig.dir === 'asc'
       ? new Date(a.created_at) - new Date(b.created_at)
@@ -154,12 +154,13 @@ export default function ClientsView() {
     setMassActionLoading(true);
     try {
       const targets = clients.filter(c => selectedIds.includes(c.id));
+      const errors = [];
       for (const client of targets) {
         // FIX: Calcular nueva valid_until desde MAX(ahora, valid_until actual) + días
         const baseDate = new Date(Math.max(Date.now(), new Date(client.valid_until || 0)));
         baseDate.setDate(baseDate.getDate() + days);
 
-        await supabase
+        const { error } = await supabase
           .from('cloud_licenses')
           .update({
             days_remaining: getLiveDays(client) + days,
@@ -168,7 +169,9 @@ export default function ClientsView() {
             updated_at: new Date().toISOString()
           })
           .eq('id', client.id);
+        if (error) errors.push(`${client.business_name || client.email}: ${error.message}`);
       }
+      if (errors.length > 0) alert(`Errores parciales:\n${errors.join('\n')}`);
       await fetchClients();
     } catch (err) {
       alert("Error en acción masiva: " + err.message);
@@ -208,7 +211,7 @@ export default function ClientsView() {
       c.plan_tier,
       c.active ? 'Activa' : 'Inactiva',
       getLiveDays(c) === Infinity ? 'Permanente' : getLiveDays(c),
-      c.valid_until ? new Date(c.valid_until).toLocaleDateString('es-ES') : '',
+      c.valid_until ? new Date(c.valid_until).toLocaleDateString('es-MX') : '',
       c.max_devices,
       c.license_type
     ]);
@@ -337,12 +340,12 @@ export default function ClientsView() {
   const formatValidUntil = (client) => {
     if (client.license_type === 'permanent') return '—';
     if (!client.valid_until) return '—';
-    return new Date(client.valid_until).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
+    return new Date(client.valid_until).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
   };
 
   const getRowClass = (client) => {
     const live = getLiveDays(client);
-    if (live === 0 && client.license_type !== 'permanent') return 'row-expired';
+    if (live <= 0 && client.license_type !== 'permanent') return 'row-expired';
     if (live > 0 && live <= 7 && client.license_type !== 'permanent') return 'row-warning';
     return '';
   };

@@ -43,7 +43,7 @@ export default function SettingsView() {
           supabase.from('cloud_licenses').select('*', { count: 'exact', head: true }),
           supabase.from('account_devices').select('*', { count: 'exact', head: true }),
           supabase.from('license_audit_logs').select('*', { count: 'exact', head: true }),
-          supabase.from('cloud_licenses').select('plan, license_tier, license_type, active'),
+          supabase.from('cloud_licenses').select('plan_tier, license_type, active'),
         ]);
 
         const connected = !licRes.error && !devRes.error;
@@ -122,7 +122,7 @@ export default function SettingsView() {
     const active = licenses.filter(l => l.active !== false && l.license_type !== 'permanent');
     let total = 0;
     for (const l of active) {
-      const tier = l.plan || l.license_tier || 'basic';
+      const tier = l.plan_tier || 'basic';
       total += prices[tier] || 0;
     }
     return total;

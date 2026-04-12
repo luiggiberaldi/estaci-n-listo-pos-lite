@@ -28,7 +28,13 @@ export default function ClientModal({ client, onClose, onUpdate }) {
   const [mrrAmount, setMrrAmount] = useState('');
   const [showMrrInput, setShowMrrInput] = useState(false);
 
-  const planPrices = JSON.parse(localStorage.getItem('abasto_plan_prices') || '{"basic":5,"pro":15,"premium":30}');
+  const planPrices = (() => {
+    try {
+      return JSON.parse(localStorage.getItem('abasto_plan_prices') || '{"basic":5,"pro":15,"premium":30}');
+    } catch {
+      return { basic: 5, pro: 15, premium: 30 };
+    }
+  })();
 
   const getComputedDays = () => {
     if (formData.license_type === 'permanent') return '∞';
@@ -119,16 +125,9 @@ export default function ClientModal({ client, onClose, onUpdate }) {
       // FIX 6: Calcular días actuales desde valid_until (no desde days_remaining stale en DB)
       const currentDays = client.license_type === 'permanent'
         ? 3650
-        : Math.max(0, Math.ceil((new Date(client.valid_until) - new Date()) / 86400000));
-
-      if (computedDays !== '∞' && computedDays > currentDays) {
-        await supabase.from('license_audit_logs').insert({
-          email: client.email,
-          action: 'DAYS_ADDED_MANUAL',
-          days_added: computedDays - currentDays,
-          mrr_value: parseFloat(mrrAmount) || 0
-        });
-      }
+        : client.valid_until
+          ? Math.max(0, Math.ceil((new Date(client.valid_until) - new Date()) / 86400000))
+          : 0;
 
       const { error } = await supabase
         .from('cloud_licenses')
@@ -146,6 +145,16 @@ export default function ClientModal({ client, onClose, onUpdate }) {
         .eq('id', client.id);
 
       if (error) throw error;
+
+      // Audit log AFTER successful update to avoid orphan entries
+      if (computedDays !== '∞' && computedDays > currentDays) {
+        await supabase.from('license_audit_logs').insert({
+          email: client.email,
+          action: 'DAYS_ADDED_MANUAL',
+          days_added: computedDays - currentDays,
+          mrr_value: parseFloat(mrrAmount) || 0
+        });
+      }
       setShowMrrInput(false);
       onUpdate();
       onClose();
@@ -407,7 +416,7 @@ export default function ClientModal({ client, onClose, onUpdate }) {
                 <tbody>
                   {historyLogs.map((log, i) => (
                     <tr key={i}>
-                      <td>{new Date(log.created_at).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
+                      <td>{new Date(log.created_at).toLocaleString('es-MX', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
                       <td><span className="badge primary">{log.action}</span></td>
                       <td>{log.days_added > 0 ? `+${log.days_added}` : log.days_added}</td>
                       <td style={{ color: log.mrr_value > 0 ? 'var(--success)' : 'var(--text-muted)' }}>

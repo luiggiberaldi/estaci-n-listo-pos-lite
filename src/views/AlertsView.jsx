@@ -129,8 +129,8 @@ export default function AlertsView() {
             Desde {formatDate(client.updated_at || client.created_at)}
           </span>
         )}
-        <span className={`tier-badge tier-${client.plan || client.license_tier || 'basic'}`}>
-          {getTierLabel(client.plan || client.license_tier)}
+        <span className={`tier-badge tier-${client.plan_tier || 'basic'}`}>
+          {getTierLabel(client.plan_tier)}
         </span>
         <div className="alert-actions">
           {showActivate ? (
